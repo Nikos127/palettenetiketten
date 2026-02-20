@@ -78,14 +78,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const btnSpeichern = document.getElementById('btnSpeichern');
     if (btnSpeichern) {
         btnSpeichern.addEventListener('click', function () {
-            const form = document.getElementById('lieferungForm');
-            if (!form) return;
-            form.classList.add('was-validated');
-            if (!form.checkValidity()) {
-                form.querySelector(':invalid')?.focus();
-                return;
-            }
-            // Daten als JSON in localStorage sichern (Offline-Speicherung)
+            if (!validiereFormular()) return;
             const data = getFormData();
             const key = 'lieferung_' + (data.lieferscheinnummer || Date.now());
             localStorage.setItem(key, JSON.stringify(data));
@@ -119,20 +112,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (btnPalettenetiketten) {
         btnPalettenetiketten.addEventListener('click', function () {
-            console.log('📋 Palettenetiketten-Button geklickt');
+            if (!validiereFormular()) return;
             palettenetikettenAusdruck();
         });
-        console.log('✅ Palettenetiketten-Button Event-Listener gesetzt');
     } else {
         console.error('❌ Palettenetiketten-Button nicht gefunden!');
     }
 
     if (btnPalettenPackliste) {
         btnPalettenPackliste.addEventListener('click', function () {
-            console.log('📋 Packliste-Button geklickt');
+            if (!validiereFormular()) return;
             palettenPacklisteAusdruck();
         });
-        console.log('✅ Packliste-Button Event-Listener gesetzt');
     } else {
         console.error('❌ Packliste-Button nicht gefunden!');
     }
@@ -158,10 +149,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const firstInvalid = form.querySelector(':invalid');
                 if (firstInvalid) {
                     firstInvalid.focus();
-                    console.log('🎯 Fokus auf ungültiges Feld:', firstInvalid.id);
                 }
 
-                alert('Bitte füllen Sie alle Pflichtfelder aus!');
                 return false;
             }
 
@@ -289,6 +278,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
     console.log('🔧 Debug-Funktionen verfügbar: testValidierung(), testBerechnung(), testDruck()');
 });
+
+// Formular-Validierung (gemeinsam für Speichern, Etiketten und Packliste)
+function validiereFormular() {
+    const form = document.getElementById('lieferungForm');
+    if (!form) return true;
+    form.classList.add('was-validated');
+    if (!form.checkValidity()) {
+        const firstInvalid = form.querySelector(':invalid');
+        if (firstInvalid) firstInvalid.focus();
+        return false;
+    }
+    return true;
+}
 
 // Hilfsfunktionen
 function isModified() {
@@ -428,7 +430,7 @@ function palettenetikettenAusdruck() {
     console.log('🎨 Palettenetiketten-Ausdruck gestartet');
 
     if (!palettenDaten || palettenDaten.length === 0) {
-        alert('Bitte erst Paletten berechnen!\n\nHinweis: Geben Sie Werte in "Erste Gebinde Nr." und "Letzte Gebinde Nr." ein.');
+        document.getElementById('erste_gebinde')?.focus();
         return;
     }
 
@@ -463,7 +465,7 @@ function palettenPacklisteAusdruck() {
     console.log('Paletten-Packliste-Ausdruck gestartet');
 
     if (!palettenDaten || palettenDaten.length === 0) {
-        alert('Bitte erst Paletten berechnen!\n\nHinweis: Geben Sie Werte in "Erste Gebinde Nr." und "Letzte Gebinde Nr." ein.');
+        document.getElementById('erste_gebinde')?.focus();
         return;
     }
 
