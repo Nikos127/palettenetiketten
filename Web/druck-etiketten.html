@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Palettenetiketten – Vorschau</title>
+    <style>
+        @page {
+            margin: 0;
+            size: A4;
+        }
+
+        @media print {
+            @page {
+                margin: 10mm;
+                size: A4;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                color: black !important;
+                background: white !important;
+            }
+
+            .etikett {
+                page-break-after: always !important;
+                display: block !important;
+                visibility: visible !important;
+            }
+
+            .etikett:last-child {
+                page-break-after: avoid !important;
+            }
+
+            * {
+                color: black !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+
+        body {
+            font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+
+        /* ===== VORSCHAU-TOOLBAR (wird beim Druck ausgeblendet) ===== */
+        .no-print {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .no-print button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            margin-left: 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .no-print button:hover {
+            background: #2980b9;
+        }
+
+        /* ===== ETIKETT ===== */
+        .etikett {
+            width: calc(100% - 30mm);
+            max-width: 180mm;
+            margin: 5mm auto;
+            page-break-after: always;
+            padding: 10mm;
+            background: white;
+            position: relative;
+        }
+
+        .etikett-tabelle {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+        }
+
+        .etikett-tabelle td {
+            border-bottom: 1px solid #000;
+            text-align: center;
+            vertical-align: middle;
+            padding: 2mm;
+        }
+
+        .header-cell {
+            font-size: 35px;
+            font-weight: bold;
+        }
+
+        .temp {
+            font-size: 35px;
+            font-weight: bold;
+        }
+
+        .kunde-cell {
+            text-align: left;
+            padding: 3mm;
+        }
+
+        .kunde-name {
+            font-size: 35px;
+            font-weight: bold;
+            margin: 1mm 0;
+        }
+
+        .info-cell {
+            font-size: 22px;
+        }
+
+        .info-value {
+            font-size: 35px;
+            font-weight: bold;
+            display: block;
+            margin-top: 2mm;
+        }
+
+        .label {
+            font-size: 18pt;
+            margin-bottom: 2mm;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Vorschau-Leiste (nicht gedruckt) -->
+    <div class="no-print">
+        📋 Temporäre Vorschau – Palettenetiketten &nbsp;|&nbsp;
+        Beispieldaten: Biotest &amp; CSL, 19.02.2026 &nbsp;
+        <button onclick="window.print()">🖨️ Drucken</button>
+    </div>
+
+    <!-- ===== ETIKETT Biotest ===== -->
+    <div class="etikett">
+        <table class="etikett-tabelle">
+            <tr>
+                <td class="header-cell" style="height: 14mm;"><strong>Human plasma for fractionation</strong></td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lagertemperatur / storage temperature:</strong><br>
+                    <span class="temp">&lt; - 20°C</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="kunde-cell" style="height: 26mm;">
+                    <div class="label"><strong>Kunde / customer:</strong></div>
+                    <div class="kunde-name">Biotest-Pharma GmbH &amp; Co KG</div>
+                    <div style="font-size: 35px; font-weight: bold;">Landsteiner Str. 5<br>D-63303 Dreieich</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lieferdatum / date of delivery:</strong><br>
+                    <span class="info-value">19.02.2026</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lieferscheinnummer / delivery note:</strong><br>
+                    <span class="info-value">LS-2026-001</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Palettennummer / pallet-No.:</strong><br>
+                    <span class="info-value">01 von/of 01</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Gebindenummer / box-Nr.: from-to:</strong><br>
+                    <span class="info-value">1&nbsp;&nbsp;&nbsp;to&nbsp;&nbsp;&nbsp;56</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Anzahl Gebinde / number of boxes:</strong><br>
+                    <span class="info-value">56</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="kunde-cell" style="height: 20mm;">
+                    <div class="label"><strong>Absender / consigner:</strong></div>
+                    <div class="kunde-name" style="font-size: 28px;">DRK Blutspendedienst West</div>
+                    <div style="font-size: 35px; font-weight: bold;">Zentrum Hagen</div>
+                    <div style="font-size: 35px; font-weight: bold;">Feithstraße 180 - 186<br>D-58097 Hagen</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <!-- ===== ETIKETT CSL ===== -->
+    <div class="etikett">
+        <table class="etikett-tabelle">
+            <tr>
+                <td class="header-cell" style="height: 14mm;"><strong>Human plasma for fractionation</strong></td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lagertemperatur / storage temperature:</strong><br>
+                    <span class="temp">&lt; - 20°C</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="kunde-cell" style="height: 26mm;">
+                    <div class="label"><strong>Kunde / customer:</strong></div>
+                    <div class="kunde-name">CSL Behring AG</div>
+                    <div style="font-size: 35px; font-weight: bold;">Wankdorfstr. 10<br>CH-03000 Bern</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lieferdatum / date of delivery:</strong><br>
+                    <span class="info-value">19.02.2026</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Lieferscheinnummer / delivery note:</strong><br>
+                    <span class="info-value">LS-2026-002</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Palettennummer / pallet-No.:</strong><br>
+                    <span class="info-value">01 von/of 01</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Gebindenummer / box-Nr.: from-to:</strong><br>
+                    <span class="info-value">1&nbsp;&nbsp;&nbsp;to&nbsp;&nbsp;&nbsp;48</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="info-cell" style="height: 14mm;">
+                    <strong>Anzahl Gebinde / number of boxes:</strong><br>
+                    <span class="info-value">48</span>
+                </td>
+            </tr>
+            <tr>
+                <td class="kunde-cell" style="height: 20mm;">
+                    <div class="label"><strong>Absender / consigner:</strong></div>
+                    <div class="kunde-name" style="font-size: 28px;">DRK Blutspendedienst West</div>
+                    <div style="font-size: 35px; font-weight: bold;">Zentrum Hagen</div>
+                    <div style="font-size: 35px; font-weight: bold;">Feithstraße 180 - 186<br>D-58097 Hagen</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+</body>
+
+</html>

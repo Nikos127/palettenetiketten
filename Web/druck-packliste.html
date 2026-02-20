@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Paletten-Packliste – Vorschau</title>
+    <style>
+        @page {
+            margin: 15mm;
+            size: A4;
+        }
+
+        @media print {
+            @page {
+                margin: 15mm;
+                size: A4;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            body {
+                margin: 0;
+            }
+        }
+
+        body {
+            font-family: Calibri, Arial, sans-serif;
+            font-size: 11pt;
+            margin: 0;
+            padding: 0;
+            color: #000;
+        }
+
+        /* ===== VORSCHAU-TOOLBAR (wird beim Druck ausgeblendet) ===== */
+        .no-print {
+            background: #2c3e50;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 14px;
+            margin-bottom: 10mm;
+        }
+
+        .no-print button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            margin-left: 15px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .no-print button:hover {
+            background: #2980b9;
+        }
+
+        /* ===== PACKLISTE ===== */
+        .packliste {
+            width: 100%;
+            max-width: 180mm;
+            margin: 0 auto;
+            padding: 0 15mm;
+            box-sizing: border-box;
+        }
+
+        h2 {
+            font-size: 16pt;
+            margin: 0 0 8mm 0;
+            text-align: left;
+        }
+
+        .header-info {
+            margin-bottom: 6mm;
+        }
+
+        .info-zeile {
+            margin: 1.2mm 0;
+        }
+
+        .abnehmer-info {
+            margin-bottom: 6mm;
+            font-weight: bold;
+        }
+
+        .paletten-tabelle {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+        }
+
+        .paletten-tabelle th,
+        .paletten-tabelle td {
+            border: 1px solid #000;
+            padding: 2.2mm;
+        }
+
+        .paletten-tabelle th {
+            background: #f3f3f3;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .zentriert {
+            text-align: center;
+        }
+
+        .gesamt-zeile td {
+            font-weight: bold;
+            background: #f9f9f9;
+        }
+
+        .unterschrift {
+            margin-top: 10mm;
+            border-top: 1px solid #999;
+            padding-top: 6mm;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Vorschau-Leiste (nicht gedruckt) -->
+    <div class="no-print">
+        📋 Temporäre Vorschau – Paletten-Packliste &nbsp;|&nbsp;
+        Beispieldaten: Baxter, 19.02.2026, LS-2026-001 &nbsp;
+        <button onclick="window.print()">🖨️ Drucken</button>
+    </div>
+
+    <div class="packliste">
+        <h2>2.4 Paletten Packliste Plasma</h2>
+
+        <div class="header-info">
+            <div class="info-zeile"><strong>Lieferschein-Nr.: LS-2026-001</strong></div>
+            <div class="info-zeile"><strong>Lieferdatum: 19.02.2026</strong></div>
+            <div class="info-zeile">Anzahl Paletten: 3</div>
+        </div>
+
+        <div class="abnehmer-info">Abnehmer: Baxter Deutschland GmbH</div>
+
+        <table class="paletten-tabelle">
+            <thead>
+                <tr>
+                    <th>Palette Nr.</th>
+                    <th>Von Gebinde</th>
+                    <th>Bis Gebinde</th>
+                    <th>Anzahl Gebinde</th>
+                    <th>Bemerkungen</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="zentriert">1</td>
+                    <td class="zentriert">1</td>
+                    <td class="zentriert">56</td>
+                    <td class="zentriert">56</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class="zentriert">2</td>
+                    <td class="zentriert">57</td>
+                    <td class="zentriert">112</td>
+                    <td class="zentriert">56</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td class="zentriert">3</td>
+                    <td class="zentriert">113</td>
+                    <td class="zentriert">148</td>
+                    <td class="zentriert">36</td>
+                    <td></td>
+                </tr>
+                <tr class="gesamt-zeile">
+                    <td colspan="3"><strong>Gesamtzahl Gebinde:</strong></td>
+                    <td class="zentriert"><strong>148</strong></td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <div class="unterschrift">
+            <div>Datum/Unterschrift Kommissionierung: ________________________</div>
+            <br>
+            <div>Datum/Unterschrift Kontrolle: ________________________</div>
+        </div>
+    </div>
+
+</body>
+
+</html>

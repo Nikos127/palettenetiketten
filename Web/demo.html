@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo - Access zu Web Migration</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .demo-section {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border-radius: 8px;
+        }
+
+        .before {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+        }
+
+        .after {
+            background: #d4edda;
+            border: 2px solid #198754;
+        }
+
+        .code-block {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container my-5">
+        <h1 class="text-center mb-5">🚀 Access → Modern Web Demo</h1>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="demo-section before">
+                    <h3>❌ Vorher: Access Form</h3>
+                    <ul>
+                        <li>Nur Windows</li>
+                        <li>Access-Lizenz nötig</li>
+                        <li>Nicht responsive</li>
+                        <li>VBA Code</li>
+                        <li>Lokale Datei</li>
+                    </ul>
+
+                    <h5>VBA Code Beispiel:</h5>
+                    <div class="code-block">
+                        Private Sub btnSpeichern_Click()
+                        If IsNull(Me.Lieferdatum) Then
+                        MsgBox "Datum fehlt!"
+                        Exit Sub
+                        End If
+                        DoCmd.Save
+                        End Sub
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="demo-section after">
+                    <h3>✅ Nachher: Modern Web</h3>
+                    <ul>
+                        <li>Alle Plattformen</li>
+                        <li>Nur Browser nötig</li>
+                        <li>Vollständig responsive</li>
+                        <li>Modern JavaScript</li>
+                        <li>Cloud/API ready</li>
+                    </ul>
+
+                    <h5>JavaScript Code Beispiel:</h5>
+                    <div class="code-block">
+                        async speichern() {
+                        if (!this.validateForm()) return;
+                        const data = this.getFormData();
+                        await this.saveToAPI(data);
+                        this.showSuccess('Gespeichert!');
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-5">
+            <a href="lieferung.html" class="btn btn-success btn-lg">
+                🎯 Live Demo öffnen
+            </a>
+            <p class="mt-3 text-muted">
+                Klicke hier um deine modernisierte Lieferung-Anwendung zu sehen!
+            </p>
+        </div>
+
+        <div class="mt-5 p-4 bg-light rounded">
+            <h4>🎓 Was du gelernt hast:</h4>
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <h6>Frontend:</h6>
+                    <ul class="list-unstyled">
+                        <li>✓ Bootstrap CSS Framework</li>
+                        <li>✓ Responsive Design</li>
+                        <li>✓ HTML5 Forms</li>
+                        <li>✓ CSS3 Animations</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6>JavaScript:</h6>
+                    <ul class="list-unstyled">
+                        <li>✓ ES6+ Classes</li>
+                        <li>✓ Event Handling</li>
+                        <li>✓ Async/Await</li>
+                        <li>✓ Form Validation</li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h6>Architecture:</h6>
+                    <ul class="list-unstyled">
+                        <li>✓ Separation of Concerns</li>
+                        <li>✓ API-Ready Design</li>
+                        <li>✓ Modern DevOps</li>
+                        <li>✓ Cross-Platform</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
