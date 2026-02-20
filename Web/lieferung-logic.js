@@ -1,960 +1,916 @@
 // =========================================
-// Lieferung Form Logic - JavaScript Version
-// Ersetzt die VBA-Logik aus Access
+// Lieferung Form Logic - Neu implementiert
 // =========================================
 
-class LieferungManager {
-    constructor() {
-        this.currentRecord = null;
-        this.isModified = false;
-        this.abnehmerData = [];
-        this.GEBINDE_PRO_PALETTE = 56; // Standard: 56 Gebinde pro Palette
-        this.palettenDaten = []; // Berechnete Paletten
-        this.loadAbnehmerData();
-        this.setDefaultValues();
-        this.updateStatus('ready', 'Bereit für neue Eingabe');
-        this.startAutoSave();
-
-        // Event-Listener erst nach DOM-Load setzen
-        setTimeout(() => {
-            this.setupEventListeners();
-
-            // Bootstrap-Validierung initial deaktivieren
-            const form = document.getElementById('lieferungForm');
-            form?.classList.remove('was-validated');
-
-            document.getElementById('lieferscheinnummer')?.focus();
-        }, 100);
-    }
-
-    setupEventListeners() {
-        // Button Events
-        document.getElementById('btnPalettenetiketten')?.addEventListener('click', () => this.palettenetikettenAusdruck());
-        document.getElementById('btnPalettenPackliste')?.addEventListener('click', () => this.palettenPacklisteAusdruck());
-
-        // Form Events
-        const form = document.getElementById('lieferungForm');
-        form?.addEventListener('submit', (e) => this.handleSubmit(e));
-
-        // Field Events - Auto-Berechnung für Gebinde UND Paletten
-        document.getElementById('erste_gebinde')?.addEventListener('input', () => {
-            this.berechnePaletten();
-        });
-        document.getElementById('letzte_gebinde')?.addEventListener('input', () => {
-            this.berechnePaletten();
-        });
-
-        // Alle Input-Felder für Änderungserkennung (außer Notizen)
-        const inputs = document.querySelectorAll('#lieferungForm input:not(#notizen), #lieferungForm select, #lieferungForm textarea:not(#notizen)');
-        inputs.forEach(input => {
-            input.addEventListener('input', () => {
-                this.isModified = true;
-                this.updateStatus('saving', 'Ungespeicherte Änderungen');
-            });
-        });
-
-        // Notizen-Feld separat behandeln (keine Validierung)
-        document.getElementById('notizen')?.addEventListener('input', (e) => {
-            const notizen = e.target;
-            notizen.classList.remove('is-valid', 'is-invalid');
-            this.isModified = true;
-            this.updateStatus('saving', 'Ungespeicherte Änderungen');
-        });
-    }
-
-    // Auto-Save (alle 30 Sekunden)
-    startAutoSave() {
-        setInterval(() => {
-            if (this.isModified) {
-                this.autoSave();
-            }
-        }, 30000);
-    }
-
-    // ===========================================
-    // DATEN-OPERATIONEN (ersetzt VBA RecordSet)
-    // ===========================================
-
-    async loadAbnehmerData() {
-        // Simuliert das Laden aus tblAbnehmer
-        try {
-            // Hier würdest du normalerweise eine API aufrufen
-            this.abnehmerData = [
-                { id: 'biotest', name: 'Biotest-Pharma GmbH & Co KG', code: 'BIO' },
-                { id: 'csl', name: 'CSL Behring', code: 'CSL' }
-            ];
-
-            this.populateAbnehmerSelect();
-        } catch (error) {
-            console.error('Fehler beim Laden der Abnehmer:', error);
-            this.showError('Abnehmer-Daten konnten nicht geladen werden');
-        }
-    }
-
-    populateAbnehmerSelect() {
-        const select = document.getElementById('abnehmer');
-
-        // Clear existing options (außer dem ersten)
-        while (select.children.length > 1) {
-            select.removeChild(select.lastChild);
-        }
-
-        // Add Abnehmer options
-        this.abnehmerData.forEach(abnehmer => {
-            const option = document.createElement('option');
-            option.value = abnehmer.id;
-            option.textContent = abnehmer.name;
-            select.appendChild(option);
-        });
-    }
-
-    // ===========================================
-    // FORM OPERATIONS (ersetzt VBA Form Events)
-    // ===========================================
-
-    neuerDatensatz() {
-        if (this.isModified) {
-            if (!confirm('Ungespeicherte Änderungen gehen verloren. Fortfahren?')) {
-                return;
-            }
-        }
-
-        // Clear all fields
-        const form = document.getElementById('lieferungForm');
-        form.reset();
-
-        // Bootstrap-Validierung zurücksetzen
-        form.classList.remove('was-validated');
-
-        // Gebinde-Felder zurücksetzen
-        this.resetGebindeValidation();
-
-        // Set defaults
-        this.setDefaultValues();
-        this.currentRecord = null;
-        this.isModified = false;
-
-        this.updateStatus('ready', 'Neuer Datensatz erstellt');
-
-        // Focus first field
-        document.getElementById('lieferscheinnummer').focus();
-    }
-
-    async speichern() {
-        if (!this.validateForm()) {
-            return false;
-        }
-
-        this.updateStatus('saving', 'Speichere...');
-
-        try {
-            const formData = this.getFormData();
-
-            // Simuliert das Speichern in die Datenbank
-            await this.saveToDatabase(formData);
-
-            this.isModified = false;
-            this.updateStatus('saved', 'Erfolgreich gespeichert');
-            this.updateLastSaved();
-
-            return true;
-        } catch (error) {
-            console.error('Speicherfehler:', error);
-            this.updateStatus('error', 'Fehler beim Speichern');
-            this.showError('Daten konnten nicht gespeichert werden: ' + error.message);
-            return false;
-        }
-    }
-
-    async loeschen() {
-        if (!this.currentRecord) {
-            this.showError('Kein Datensatz zum Löschen ausgewählt');
-            return;
-        }
-
-        if (!confirm('Datensatz wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.')) {
-            return;
-        }
-
-        try {
-            // Simuliert das Löschen aus der Datenbank
-            await this.deleteFromDatabase(this.currentRecord.id);
-
-            this.neuerDatensatz();
-            this.showSuccess('Datensatz erfolgreich gelöscht');
-        } catch (error) {
-            console.error('Löschfehler:', error);
-            this.showError('Fehler beim Löschen: ' + error.message);
-        }
-    }
-
-    // ===========================================
-    // PALETTEN BUSINESS LOGIC (Hauptlogik)
-    // ===========================================
-
-    berechnePaletten() {
-        const ersteGebinde = document.getElementById('erste_gebinde').value;
-        const letzteGebinde = document.getElementById('letzte_gebinde').value;
-
-        if (ersteGebinde && letzteGebinde) {
-            // Extract numbers from gebinde strings (z.B. "220" -> 220)
-            const ersteNr = this.extractNumber(ersteGebinde);
-            const letzteNr = this.extractNumber(letzteGebinde);
-
-            if (ersteNr && letzteNr && letzteNr >= ersteNr) {
-                // Gesamtanzahl Gebinde berechnen
-                const gesamtGebinde = letzteNr - ersteNr + 1;
-                document.getElementById('anzahl_gebinde').value = gesamtGebinde;
-
-                // Paletten berechnen
-                const anzahlPaletten = Math.ceil(gesamtGebinde / this.GEBINDE_PRO_PALETTE);
-                document.getElementById('anzahl_paletten').value = anzahlPaletten;
-
-                // Detaillierte Paletten-Aufteilung berechnen
-                this.palettenDaten = this.berechnePalettenDetails(ersteNr, letzteNr);
-
-                // Paletten-Übersicht anzeigen
-                this.updatePalettenUebersicht();
-
-                // Debug output
-                console.log('Paletten-Berechnung:', {
-                    ersteGebinde: ersteNr,
-                    letzteGebinde: letzteNr,
-                    gesamtGebinde,
-                    anzahlPaletten,
-                    paletten: this.palettenDaten
-                });
-
-            } else {
-                document.getElementById('anzahl_gebinde').value = '';
-                document.getElementById('anzahl_paletten').value = '';
-                this.palettenDaten = [];
-                this.updatePalettenUebersicht();
-            }
-        } else {
-            // Felder leeren wenn Eingabe ungültig
-            document.getElementById('anzahl_gebinde').value = '';
-            document.getElementById('anzahl_paletten').value = '';
-            this.palettenDaten = [];
-            this.updatePalettenUebersicht();
-        }
-    }
-
-    berechnePalettenDetails(ersteNr, letzteNr) {
-        const paletten = [];
-        let aktuelleGebindeNr = ersteNr;
-        let palettenNr = 1;
-
-        while (aktuelleGebindeNr <= letzteNr) {
-            const palettenStart = aktuelleGebindeNr;
-            const palettenEnde = Math.min(aktuelleGebindeNr + this.GEBINDE_PRO_PALETTE - 1, letzteNr);
-            const gebindeAufPalette = palettenEnde - palettenStart + 1;
-
-            paletten.push({
-                palettenNr: palettenNr,
-                vonGebinde: palettenStart,
-                bisGebinde: palettenEnde,
-                anzahlGebinde: gebindeAufPalette,
-                istVollePalette: gebindeAufPalette === this.GEBINDE_PRO_PALETTE
-            });
-
-            aktuelleGebindeNr = palettenEnde + 1;
-            palettenNr++;
-        }
-
-        return paletten;
-    }
-
-    updatePalettenUebersicht() {
-        const uebersicht = document.getElementById('palettenUebersicht');
-        const tabelle = document.getElementById('palettenTabelle');
-
-        if (this.palettenDaten.length > 0) {
-            // Tabelle füllen
-            tabelle.innerHTML = this.palettenDaten.map(palette => `
-                <tr>
-                    <td><strong>${palette.palettenNr}</strong></td>
-                    <td>${palette.vonGebinde}</td>
-                    <td>${palette.bisGebinde}</td>
-                    <td>
-                        <span class="badge ${palette.istVollePalette ? 'bg-success' : 'bg-warning text-dark'}">
-                            ${palette.anzahlGebinde}
-                        </span>
-                    </td>
-                    <td>
-                        ${palette.istVollePalette ?
-                    '<i class="bi bi-check-circle text-success"></i> Vollständig' :
-                    '<i class="bi bi-exclamation-triangle text-warning"></i> Teilpalette'
-                }
-                    </td>
-                </tr>
-            `).join('');
-
-            // Übersicht anzeigen
-            uebersicht.style.display = 'block';
-        } else {
-            // Übersicht verstecken
-            uebersicht.style.display = 'none';
-        }
-    }
-
-    // Spezielle Validierung für Gebinde-Felder (jetzt Pflichtfelder)
-    handleGebindeValidation() {
-        const ersteGebinde = document.getElementById('erste_gebinde');
-        const letzteGebinde = document.getElementById('letzte_gebinde');
-
-        // Entferne alte Validierungs-Klassen
-        ersteGebinde.classList.remove('is-valid', 'is-invalid');
-        letzteGebinde.classList.remove('is-valid', 'is-invalid');
-
-        // Prüfe ob beide Felder ausgefüllt sind (jetzt required)
-        if (!ersteGebinde.value.trim() || !letzteGebinde.value.trim()) {
-            // Leer = invalid wegen required
-            if (!ersteGebinde.value.trim()) ersteGebinde.classList.add('is-invalid');
-            if (!letzteGebinde.value.trim()) letzteGebinde.classList.add('is-invalid');
-            return;
-        }
-
-        // Beide ausgefüllt - prüfe Logik
-        const ersteNr = this.extractNumber(ersteGebinde.value);
-        const letzteNr = this.extractNumber(letzteGebinde.value);
-
-        if (ersteNr && letzteNr && letzteNr >= ersteNr) {
-            // Gültig - grüne Haken anzeigen
-            ersteGebinde.classList.add('is-valid');
-            letzteGebinde.classList.add('is-valid');
-        } else {
-            // Ungültig - rote X anzeigen
-            ersteGebinde.classList.add('is-invalid');
-            letzteGebinde.classList.add('is-invalid');
-        }
-    }
-
-    // Gebinde-Validierung zurücksetzen
-    resetGebindeValidation() {
-        const ersteGebinde = document.getElementById('erste_gebinde');
-        const letzteGebinde = document.getElementById('letzte_gebinde');
-
-        if (ersteGebinde && letzteGebinde) {
-            ersteGebinde.classList.remove('is-valid', 'is-invalid');
-            letzteGebinde.classList.remove('is-valid', 'is-invalid');
-        }
-    }
-
-    // Force Reset aller Validierungszustände
-    forceResetValidation() {
-        const inputs = document.querySelectorAll('#erste_gebinde, #letzte_gebinde');
-        inputs.forEach(input => {
-            input.classList.remove('is-valid', 'is-invalid');
-            // CSS übernimmt jetzt die background-image Kontrolle
-        });
-    }
-
-    // Neues Fenster für Palettenetiketten
-    const printWindow = window.open('', '_blank', 'width=800,height=600');
-    const etiketten = this.generiereEtikettenHTML();
-
-printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Palettenetiketten - ${this.getFormData().lieferscheinnummer}</title >
-    <style>
-        ${this.getEtikettenCSS()}
-    </style>
-            </head >
-    <body>
-        ${etiketten}
-        <script>window.print();</script>
-    </body>
-            </html >
-    `);
-
-printWindow.document.close();
-    }
-
-generiereEtikettenHTML() {
-    const formData = this.getFormData();
-    const abnehmerInfo = this.getAbnehmerDetails(formData.abnehmer);
-
-    return this.palettenDaten.map(palette => `
-    < div class="etikett" >
-        <table class="etikett-tabelle">
-            <tr>
-                <td class="header-cell"><strong>Human plasma for fractionation</strong></td>
-            </tr>
-            <tr>
-                <td class="sub-header">
-                    <strong>Lagertemperatur / storage temperature:</strong><br>
-                        <span class="temp">&lt; - 20°C</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="kunde-cell">
-                    <div class="label"><strong>Kunde / customer:</strong></div>
-                    <div class="kunde-name">${abnehmerInfo.fullName}</div>
-                    <div class="adresse">${abnehmerInfo.adresse.replace('\n', '<br>')}</div>
-                </td>
-            </tr>
-            <tr>
-                <td class="info-cell">
-                    <strong>Lieferdatum / date of delivery:</strong><br>
-                        <span class="info-value">${this.formatDate(formData.lieferdatum)}</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="info-cell">
-                    <strong>Lieferscheinnummer / delivery note:</strong><br>
-                        <span class="info-value">${formData.lieferscheinnummer}</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="info-cell">
-                    <strong>Palettennummer / pallet-No.:</strong><br>
-                        <span class="info-value">${palette.palettenNr.toString().padStart(2, '0')} von/of ${this.palettenDaten.length.toString().padStart(2, '0')}</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="info-cell">
-                    <strong>Gebindenummer / box-Nr.: from-to:</strong><br>
-                        <span class="info-value">${palette.vonGebinde}&nbsp;&nbsp;&nbsp;to&nbsp;&nbsp;&nbsp;${palette.bisGebinde}</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="info-cell">
-                    <strong>Anzahl Gebinde / number of boxes:</strong><br>
-                        <span class="info-value">${palette.anzahlGebinde}</span>
-                </td>
-            </tr>
-            <tr>
-                <td class="absender-cell">
-                    <div class="label"><strong>Absender / consigner</strong></div>
-                    <div class="absender-name">DRK Blutspendedienst West</div>
-                    <div class="absender-name">Zentrum Hagen</div>
-                    <div class="absender-adresse">Feithstraße 180 - 186<br>D-58097 Hagen</div>
-                </td>
-            </tr>
-        </table>
-            </div >
-    `).join('');
-}
-
-// ===========================================
-// PALETTEN-PACKLISTE GENERIERUNG  
-// ===========================================
-
-palettenPacklisteAusdruck() {
-    if (this.palettenDaten.length === 0) {
-        this.showError('Bitte erst Gebinde-Nummern eingeben um Paletten zu berechnen');
-        return;
-    }
-
-    const printWindow = window.open('', '_blank', 'width=800,600');
-    const packliste = this.generierePacklisteHTML();
-
-    printWindow.document.write(`
-    < !DOCTYPE html >
-        <html>
-            <head>
-                <title>Paletten Packliste - ${this.getFormData().lieferscheinnummer}</title>
-                <style>
-                    ${this.getPacklisteCSS()}
-                </style>
-            </head>
-            <body>
-                ${packliste}
-                <script>window.print();</script>
-            </body>
-        </html>
-`);
-
-    printWindow.document.close();
-}
-
-generierePacklisteHTML() {
-    const formData = this.getFormData();
-    const gesamtGebinde = this.palettenDaten.reduce((sum, p) => sum + p.anzahlGebinde, 0);
-
-    return `
-    < div class="packliste" >
-                <h2>2.4 Paletten Packliste Plasma</h2>
-                
-                <div class="header-info">
-                    <div class="info-zeile"><strong>Lieferschein-Nr.: ${formData.lieferscheinnummer}</strong></div>
-                    <div class="info-zeile"><strong>Lieferdatum: ${this.formatDate(formData.lieferdatum)}</strong></div>
-                    <div class="info-zeile">Anzahl Plasmen: ${gesamtGebinde * 35} <!-- Annahme: 35 Plasmen pro Gebinde --></div>
-                    <div class="info-zeile">Anzahl Paletten: ${this.palettenDaten.length}</div>
-                </div>
-                
-                <div class="abnehmer-info">
-                    <strong>Abnehmer: ${formData.abnehmer}</strong>
-                </div>
-                
-                <table class="paletten-tabelle">
-                    <thead>
-                        <tr>
-                            <th>Paletten-<br>Nr.</th>
-                            <th>von Gebinde</th>
-                            <th>bis Gebinde</th>
-                            <th>Anzahl Gebinde/Palette</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${this.palettenDaten.map(palette => `
-                            <tr>
-                                <td class="zentriert">${palette.palettenNr}</td>
-                                <td class="zentriert">${palette.vonGebinde}</td>
-                                <td class="zentriert">${palette.bisGebinde}</td>
-                                <td class="zentriert">${palette.anzahlGebinde}</td>
-                            </tr>
-                        `).join('')}
-                        <tr class="gesamt-zeile">
-                            <td colspan="3"><strong>Gesamtzahl Gebinde:</strong></td>
-                            <td class="zentriert"><strong>${gesamtGebinde}</strong></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div >
-    `;
-}
-
-extractNumber(gebindeString) {
-    // Extract number from formats like "G-0001", "220", etc.
-    const match = gebindeString.toString().match(/\d+/);
-    return match ? parseInt(match[0], 10) : null;
-}
-
-getAbnehmerDetails(abnehmerId) {
-    const abnehmerMap = {
-        'biotest': {
-            fullName: 'Biotest-Pharma GmbH & Co KG',
-            adresse: 'Landsteiner Str. 5\nD-63303 Dreieich'
-        },
-        'csl': {
-            fullName: 'CSL Behring AG',
-            adresse: 'Wankdorfstr. 10\nCH-03000 Bern'
-        }
-    };
-    return abnehmerMap[abnehmerId] || { fullName: 'Unbekannt', adresse: '' };
-}
-
-formatDate(dateString) {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('de-DE', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-    });
-}
-
-// ===========================================
-// PRINT STYLES
-// ===========================================
-
-getEtikettenCSS() {
-    return `
-@page {
-    margin: 0;
-    size: A4;
-}
-
-@media print {
-    @page {
-        margin: 0;
-        size: A4;
-    }
-
-                .no - print {
-        display: none!important;
-    }
-
-                .etikett {
-        page -break-after: always!important;
-    }
-
-                .etikett: last - child {
-        page -break-after: avoid!important;
-    }
-
-                * {
-                    - webkit - print - color - adjust: exact!important;
-    print - color - adjust: exact!important;
-}
-            }
-            
-            body {
-    font - family: 'Calibri', 'Segoe UI', Tahoma, Geneva, Verdana, sans - serif;
-    margin: 0;
-    padding: 0;
-}
-            
-            .etikett {
-    width: calc(100 % - 30mm);
-    max - width: 180mm;
-    margin: 5mm auto;
-    page -break-after: always;
-    padding: 10mm;
-    background: white;
-    position: relative;
-    z - index: 1000;
-}
-            
-            .etikett - tabelle {
-    width: 100 %;
-    border - collapse: collapse;
-    border: 1px solid #000;
-}
-            
-            .etikett - tabelle td {
-    border - bottom: 1px solid #000;
-    text - align: center;
-    vertical - align: middle;
-}
-            
-            .header - cell {
-    font - size: 35px;
-    font - weight: bold;
-}
-            
-            .sub - header {
-    font - size: 22px;
-}
-            
-            .temp {
-    font - size: 35px;
-    font - weight: bold;
-}
-            
-            .kunde - cell, .absender - cell {
-    text - align: left;
-}
-            
-            .kunde - name, .absender - name {
-    font - size: 35px;
-    font - weight: bold;
-    margin: 1mm 0;
-}
-            
-            .adresse, .absender - adresse {
-    font - size: 35px;
-    font - weight: bold;
-    margin - bottom: 4mm;
-}
-            
-            .info - cell {
-    font - size: 22px;
-}
-            
-            .info - value {
-    font - size: 35px;
-    font - weight: bold;
-    display: block;
-    margin - top: 2mm;
-}
-            
-            .label {
-    font - size: 18pt;
-    margin - bottom: 2mm;
-}
-`;
-}
-
-getPacklisteCSS() {
-    return `
-@page {
-    margin: 15mm;
-    size: A4;
-}
-            
-            body {
-    font - family: Arial, sans - serif;
-    font - size: 11pt;
-    margin: 0;
-    padding: 0;
-}
-            
-            .packliste {
-    max - width: 100 %;
-    margin: 0 auto;
-}
-            
-            h2 {
-    font - size: 14pt;
-    margin - bottom: 20px;
-    text - align: left;
-}
-            
-            .header - info {
-    margin - bottom: 20px;
-}
-            
-            .info - zeile {
-    margin: 4px 0;
-    font - size: 11pt;
-}
-            
-            .abnehmer - info {
-    margin: 15px 0;
-    font - size: 12pt;
-}
-            
-            .paletten - tabelle {
-    width: 100 %;
-    border - collapse: collapse;
-    margin - top: 15px;
-}
-            
-            .paletten - tabelle th,
-            .paletten - tabelle td {
-    border: 1px solid #000;
-    padding: 8px;
-    text - align: left;
-    font - size: 10pt;
-}
-            
-            .paletten - tabelle th {
-    background - color: #f0f0f0;
-    font - weight: bold;
-    text - align: center;
-}
-            
-            .zentriert {
-    text - align: center!important;
-}
-            
-            .gesamt - zeile {
-    background - color: #f5f5f5;
-    font - weight: bold;
-}
-`;
-}
-
-validateDatum() {
-    const datumInput = document.getElementById('lieferdatum');
-    const datum = new Date(datumInput.value);
-    const heute = new Date();
-
-    // Remove time component für comparison
-    heute.setHours(0, 0, 0, 0);
-
-    if (datum > heute) {
-        if (!confirm('Das Lieferdatum liegt in der Zukunft. Ist das korrekt?')) {
-            datumInput.value = heute.toISOString().split('T')[0];
-        }
-    }
-}
-
-generateLieferscheinnummer() {
-    const abnehmerCode = this.getSelectedAbnehmerCode();
-    const datum = new Date().toISOString().slice(2, 10).replace(/-/g, ''); // YYMMDD
-    const randomNr = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-
-    return `LSN - ${ abnehmerCode } -${ datum } -${ randomNr } `;
-}
-
-getSelectedAbnehmerCode() {
-    const abnehmerId = document.getElementById('abnehmer').value;
-    const abnehmer = this.abnehmerData.find(a => a.id === abnehmerId);
-    return abnehmer ? abnehmer.code : 'XXX';
-}
-
-// ===========================================
-// VALIDATION (ersetzt VBA Validation)
-// ===========================================
-
-validateForm() {
-    const form = document.getElementById('lieferungForm');
-
-    // Bootstrap validation
-    if (!form.checkValidity()) {
-        form.classList.add('was-validated');
-        this.showError('Bitte füllen Sie alle Pflichtfelder aus');
-        return false;
-    }
-
-    // Custom validations
-    const errors = [];
-
-    // Datum validation
-    const lieferdatum = new Date(document.getElementById('lieferdatum').value);
-    const vor30Tagen = new Date();
-    vor30Tagen.setDate(vor30Tagen.getDate() - 30);
-
-    if (lieferdatum < vor30Tagen) {
-        errors.push('Lieferdatum darf nicht älter als 30 Tage sein');
-    }
-
-    // Gebinde validation
-    const ersteGebinde = document.getElementById('erste_gebinde').value;
-    const letzteGebinde = document.getElementById('letzte_gebinde').value;
+// Globale Variablen
+let palettenDaten = [];
+const GEBINDE_PRO_PALETTE = 56;
+
+// Sofort nach DOM-Load ausführen
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('DOM geladen - starte Initialisierung');
+
+    // Event-Listener für Gebinde-Felder
+    const ersteGebinde = document.getElementById('erste_gebinde');
+    const letzteGebinde = document.getElementById('letzte_gebinde');
 
     if (ersteGebinde && letzteGebinde) {
-        const ersteNr = this.extractNumber(ersteGebinde);
-        const letzteNr = this.extractNumber(letzteGebinde);
+        console.log('Gebinde-Felder gefunden - setze Event-Listener');
 
-        if (letzteNr < ersteNr) {
-            errors.push('Letzte Gebinde-Nummer muss größer als erste sein');
+        ersteGebinde.addEventListener('input', function () {
+            console.log('🔄 Erste Gebinde geändert:', this.value);
+            setTimeout(() => berechnePaletten(), 10); // Kurze Verzögerung für bessere Performance
+        });
+
+        letzteGebinde.addEventListener('input', function () {
+            console.log('🔄 Letzte Gebinde geändert:', this.value);
+            setTimeout(() => berechnePaletten(), 10); // Kurze Verzögerung für bessere Performance
+        });
+
+        // Notizen-Feld neutral halten (nie validieren)
+        const notizen = document.getElementById('notizen');
+        if (notizen) {
+            // Entferne required-Attribut falls vorhanden
+            notizen.removeAttribute('required');
+
+            notizen.addEventListener('focus', function () {
+                this.classList.remove('is-valid', 'is-invalid');
+            });
+            notizen.addEventListener('input', function () {
+                this.classList.remove('is-valid', 'is-invalid');
+            });
+            notizen.addEventListener('blur', function () {
+                this.classList.remove('is-valid', 'is-invalid');
+            });
+
+            console.log('Notizen-Feld für neutrale Validierung konfiguriert');
         }
+
+        console.log('Event-Listener erfolgreich gesetzt');
+    } else {
+        console.error('Gebinde-Felder nicht gefunden!');
     }
 
-    if (errors.length > 0) {
-        this.showError(errors.join('\n'));
+    // Button Event-Listener mit Debug-Ausgaben
+    // --- Neu ---
+    const btnNeu = document.getElementById('btnNeu');
+    if (btnNeu) {
+        btnNeu.addEventListener('click', function () {
+            const form = document.getElementById('lieferungForm');
+            if (!form) return;
+            if (form.querySelector('[required]') && isModified()) {
+                if (!confirm('Ungespeicherte Änderungen gehen verloren. Fortfahren?')) return;
+            }
+            form.reset();
+            form.classList.remove('was-validated');
+            palettenDaten = [];
+            versteckePalettenUebersicht();
+            // Pflichtfelder wieder rot markieren
+            form.querySelectorAll('[required]').forEach(f => {
+                f.classList.remove('is-valid');
+                f.classList.add('is-invalid');
+            });
+            document.getElementById('lieferscheinnummer')?.focus();
+        });
+    }
+
+    // --- Speichern ---
+    const btnSpeichern = document.getElementById('btnSpeichern');
+    if (btnSpeichern) {
+        btnSpeichern.addEventListener('click', function () {
+            if (!validiereFormular()) return;
+            const data = getFormData();
+            const key = 'lieferung_' + (data.lieferscheinnummer || Date.now());
+            localStorage.setItem(key, JSON.stringify(data));
+            alert('Datensatz gespeichert:\n' + key);
+        });
+    }
+
+    // --- Löschen ---
+    const btnLoeschen = document.getElementById('btnLoeschen');
+    if (btnLoeschen) {
+        btnLoeschen.addEventListener('click', function () {
+            const form = document.getElementById('lieferungForm');
+            if (!form) return;
+            const lsnr = document.getElementById('lieferscheinnummer')?.value;
+            if (!lsnr) {
+                alert('Kein Datensatz geladen.');
+                return;
+            }
+            if (!confirm('Datensatz "' + lsnr + '" wirklich löschen?')) return;
+            localStorage.removeItem('lieferung_' + lsnr);
+            form.reset();
+            form.classList.remove('was-validated');
+            palettenDaten = [];
+            versteckePalettenUebersicht();
+            alert('Datensatz gelöscht.');
+        });
+    }
+
+    const btnPalettenetiketten = document.getElementById('btnPalettenetiketten');
+    const btnPalettenPackliste = document.getElementById('btnPalettenPackliste');
+
+    if (btnPalettenetiketten) {
+        btnPalettenetiketten.addEventListener('click', function () {
+            if (!validiereFormular()) return;
+            palettenetikettenAusdruck();
+        });
+    } else {
+        console.error('❌ Palettenetiketten-Button nicht gefunden!');
+    }
+
+    if (btnPalettenPackliste) {
+        btnPalettenPackliste.addEventListener('click', function () {
+            if (!validiereFormular()) return;
+            palettenPacklisteAusdruck();
+        });
+    } else {
+        console.error('❌ Packliste-Button nicht gefunden!');
+    }
+
+    // Form Submit Handler - VERHINDERT Formular-Reset
+    const form = document.getElementById('lieferungForm');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            // IMMER verhindern, dass das Formular abgesendet wird
+            e.preventDefault();
+            e.stopPropagation();
+
+            console.log('💾 Speichern-Button geklickt');
+
+            // Bootstrap-Validierung aktivieren
+            form.classList.add('was-validated');
+
+            // Prüfe ob Formular gültig ist
+            if (!form.checkValidity()) {
+                console.log('❌ Formular ungültig - kann nicht gespeichert werden');
+
+                // Fokus auf erstes ungültiges Feld setzen
+                const firstInvalid = form.querySelector(':invalid');
+                if (firstInvalid) {
+                    firstInvalid.focus();
+                }
+
+                return false;
+            }
+
+            // Formular ist gültig - simuliere Speicherung
+            console.log('✅ Formular gültig - simuliere Speicherung');
+
+            // Sammle Formular-Daten
+            const formData = {
+                lieferdatum: document.getElementById('lieferdatum').value,
+                lieferscheinnummer: document.getElementById('lieferscheinnummer').value,
+                abnehmer: document.getElementById('abnehmer').value,
+                ersteGebinde: document.getElementById('erste_gebinde').value,
+                letzteGebinde: document.getElementById('letzte_gebinde').value,
+                anzahlGebinde: document.getElementById('anzahl_gebinde').value,
+                anzahlPaletten: document.getElementById('anzahl_paletten').value,
+                notizen: document.getElementById('notizen').value,
+                zeitstempel: new Date().toLocaleString('de-DE')
+            };
+
+            console.log('📁 Zu speichernde Daten:', formData);
+
+            // Simuliere erfolgreiche Speicherung
+            alert('✅ Daten erfolgreich gespeichert!\n\nLieferschein: ' + formData.lieferscheinnummer + '\nPaletten: ' + formData.anzahlPaletten);
+
+            // Update Last-Saved Zeit
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('de-DE', {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('lastSaved').textContent = timeString;
+
+            return false; // Immer false, damit nichts resettet wird
+        });
+
+        // Validierung auch bei Input-Events aktivieren
+        const requiredFields = form.querySelectorAll('[required]');
+        requiredFields.forEach(field => {
+            field.addEventListener('input', function () {
+                if (this.checkValidity()) {
+                    this.classList.remove('is-invalid');
+                    this.classList.add('is-valid');
+                } else {
+                    this.classList.remove('is-valid');
+                    this.classList.add('is-invalid');
+                }
+            });
+
+            field.addEventListener('blur', function () {
+                if (form.classList.contains('was-validated')) {
+                    if (this.checkValidity()) {
+                        this.classList.remove('is-invalid');
+                        this.classList.add('is-valid');
+                    } else {
+                        this.classList.remove('is-valid');
+                        this.classList.add('is-invalid');
+                    }
+                }
+            });
+        });
+    }
+
+    console.log('Initialisierung abgeschlossen');
+
+    // Initiale Validierung aktivieren für sofortige Anzeige roter Rahmen bei leeren Pflichtfeldern
+    setTimeout(() => {
+        const form = document.getElementById('lieferungForm');
+        if (form) {
+            const requiredFields = form.querySelectorAll('[required]');
+            requiredFields.forEach(field => {
+                if (!field.value.trim() && field.id !== 'notizen') {
+                    field.classList.add('is-invalid');
+                }
+            });
+            console.log('Initiale Validierung für Pflichtfelder gesetzt');
+        }
+    }, 200);
+
+    // Test-Funktionen für Debugging
+    window.testValidierung = function () {
+        console.log('=== Validierungs-Test ===');
+        const form = document.getElementById('lieferungForm');
+        if (form) {
+            form.classList.add('was-validated');
+            const isValid = form.checkValidity();
+            console.log('Formular gültig:', isValid);
+
+            const invalidFields = form.querySelectorAll(':invalid');
+            console.log('Ungültige Felder:', invalidFields.length);
+            invalidFields.forEach(field => {
+                console.log('- Ungültig:', field.id, field.validationMessage);
+            });
+        }
+    };
+
+    // Test-Funktion für Berechnung
+    window.testBerechnung = function () {
+        console.log('=== 🧮 Berechnungs-Test ===');
+        document.getElementById('erste_gebinde').value = 'G-0001';
+        document.getElementById('letzte_gebinde').value = 'G-0112';
+        berechnePaletten();
+        console.log('📈 Anzahl Gebinde:', document.getElementById('anzahl_gebinde').value);
+        console.log('📦 Anzahl Paletten:', document.getElementById('anzahl_paletten').value);
+        console.log('📋 Paletten-Daten:', palettenDaten);
+    };
+
+    // Test-Funktion für Druck
+    window.testDruck = function () {
+        console.log('=== Druck-Test ===');
+        console.log('Paletten-Daten:', palettenDaten);
+        console.log('Anzahl Paletten:', palettenDaten.length);
+
+        if (palettenDaten.length > 0) {
+            console.log('✅ Daten vorhanden - teste Etiketten-Druck');
+            palettenetikettenAusdruck();
+        } else {
+            console.log('❌ Keine Paletten-Daten - führe Test-Berechnung durch');
+            window.testBerechnung();
+            setTimeout(() => {
+                console.log('🔄 Test-Daten gesetzt, erneut versuchen...');
+                palettenetikettenAusdruck();
+            }, 500);
+        }
+    };
+
+    console.log('🔧 Debug-Funktionen verfügbar: testValidierung(), testBerechnung(), testDruck()');
+});
+
+// Formular-Validierung (gemeinsam für Speichern, Etiketten und Packliste)
+function validiereFormular() {
+    const form = document.getElementById('lieferungForm');
+    if (!form) return true;
+    form.classList.add('was-validated');
+    if (!form.checkValidity()) {
+        const firstInvalid = form.querySelector(':invalid');
+        if (firstInvalid) firstInvalid.focus();
         return false;
     }
-
     return true;
 }
 
-// ===========================================
-// HELPER FUNCTIONS
-// ===========================================
-
-setDefaultValues() {
-    // Set heute als default Lieferdatum
-    const heute = new Date().toISOString().split('T')[0];
-    document.getElementById('lieferdatum').value = heute;
-
-    // Lieferscheinnummer bleibt leer - muss manuell eingegeben werden
+// Hilfsfunktionen
+function isModified() {
+    const form = document.getElementById('lieferungForm');
+    if (!form) return false;
+    return Array.from(form.elements).some(el => el.value && el.value.trim() !== '');
 }
 
-getFormData() {
+function getFormData() {
     return {
-        lieferdatum: document.getElementById('lieferdatum').value,
-        lieferscheinnummer: document.getElementById('lieferscheinnummer').value,
-        abnehmer: document.getElementById('abnehmer').value,
-        anzahl_paletten: parseInt(document.getElementById('anzahl_paletten').value) || 0,
-        erste_gebinde: document.getElementById('erste_gebinde').value,
-        letzte_gebinde: document.getElementById('letzte_gebinde').value,
-        anzahl_gebinde: parseInt(document.getElementById('anzahl_gebinde').value) || 0,
-        notizen: document.getElementById('notizen').value,
-        erstellt: new Date().toISOString()
+        lieferscheinnummer: document.getElementById('lieferscheinnummer')?.value || '',
+        lieferdatum: document.getElementById('lieferdatum')?.value || '',
+        abnehmer: document.getElementById('abnehmer')?.value || '',
+        erste_gebinde: document.getElementById('erste_gebinde')?.value || '',
+        letzte_gebinde: document.getElementById('letzte_gebinde')?.value || '',
+        anzahl_gebinde: document.getElementById('anzahl_gebinde')?.value || '',
+        anzahl_paletten: document.getElementById('anzahl_paletten')?.value || '',
+        notizen: document.getElementById('notizen')?.value || '',
+        palettenDaten: palettenDaten
     };
 }
 
-    async saveToDatabase(data) {
-    // Simuliert API call - hier würdest du zur REST API gehen
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (Math.random() > 0.001) { // 99.9% success rate
-                console.log('Daten gespeichert:', data);
-                resolve({ id: Date.now(), ...data });
-            } else {
-                reject(new Error('Datenbankfehler'));
-            }
-        }, 1000);
-    });
-}
+// Paletten-Berechnung
+function berechnePaletten() {
+    console.log('berechnePaletten() aufgerufen');
 
-    async deleteFromDatabase(id) {
-    // Simuliert API call für DELETE
-    return new Promise((resolve, reject) => {
-        setTimeout(() => {
-            if (Math.random() > 0.001) { // 99.9% success rate
-                resolve({ deleted: id });
-            } else {
-                reject(new Error('Löschvorgang fehlgeschlagen'));
-            }
-        }, 500);
-    });
-}
+    const ersteGebinde = document.getElementById('erste_gebinde').value.trim();
+    const letzteGebinde = document.getElementById('letzte_gebinde').value.trim();
 
-    async autoSave() {
-    if (this.validateForm()) {
-        try {
-            await this.speichern();
-            console.log('Auto-Save erfolgreich');
-        } catch (error) {
-            console.warn('Auto-Save fehlgeschlagen:', error);
-        }
+    console.log('Eingabewerte:', ersteGebinde, letzteGebinde);
+
+    // Felder leeren wenn eine Eingabe fehlt
+    if (!ersteGebinde || !letzteGebinde) {
+        document.getElementById('anzahl_gebinde').value = '';
+        document.getElementById('anzahl_paletten').value = '';
+        versteckePalettenUebersicht();
+        console.log('Eingaben unvollständig - Felder geleert');
+        return;
+    }
+
+    // Zahlen extrahieren
+    const ersteNr = extractNumber(ersteGebinde);
+    const letzteNr = extractNumber(letzteGebinde);
+
+    console.log('Extrahierte Zahlen:', ersteNr, letzteNr);
+
+    if (ersteNr && letzteNr && letzteNr >= ersteNr) {
+        // Gültige Berechnung
+        const gesamtGebinde = letzteNr - ersteNr + 1;
+        const anzahlPaletten = Math.ceil(gesamtGebinde / GEBINDE_PRO_PALETTE);
+
+        console.log('Berechnung:', gesamtGebinde, 'Gebinde,', anzahlPaletten, 'Paletten');
+
+        // Ergebnisse eintragen
+        document.getElementById('anzahl_gebinde').value = gesamtGebinde;
+        document.getElementById('anzahl_paletten').value = anzahlPaletten;
+
+        // Paletten-Details berechnen
+        palettenDaten = berechnePalettenDetails(ersteNr, letzteNr);
+        zeigePalettenUebersicht();
+
+    } else {
+        // Ungültige Eingabe
+        document.getElementById('anzahl_gebinde').value = '';
+        document.getElementById('anzahl_paletten').value = '';
+        versteckePalettenUebersicht();
+        console.log('Ungültige Eingaben');
     }
 }
 
-handleSubmit(event) {
-    event.preventDefault();
-    this.speichern();
+// Zahl aus String extrahieren
+function extractNumber(str) {
+    const match = str.toString().match(/\d+/);
+    return match ? parseInt(match[0], 10) : null;
 }
 
-drucken() {
-    window.print();
+// Paletten-Details berechnen
+function berechnePalettenDetails(ersteNr, letzteNr) {
+    const paletten = [];
+    const gesamtGebinde = letzteNr - ersteNr + 1;
+    let aktuelleGebindeNr = ersteNr;
+
+    for (let paletteNr = 1; aktuelleGebindeNr <= letzteNr; paletteNr++) {
+        const verbleibendeGebinde = letzteNr - aktuelleGebindeNr + 1;
+        const gebindeAufPalette = Math.min(GEBINDE_PRO_PALETTE, verbleibendeGebinde);
+
+        paletten.push({
+            paletteNr: paletteNr,
+            vonGebinde: aktuelleGebindeNr,
+            bisGebinde: aktuelleGebindeNr + gebindeAufPalette - 1,
+            anzahlGebinde: gebindeAufPalette
+        });
+
+        aktuelleGebindeNr += gebindeAufPalette;
+    }
+
+    return paletten;
 }
 
-// ===========================================
-// UI FEEDBACK FUNCTIONS
-// ===========================================
+// Paletten-Übersicht anzeigen
+function zeigePalettenUebersicht() {
+    const uebersicht = document.getElementById('palettenUebersicht');
+    if (!uebersicht || palettenDaten.length === 0) return;
 
-updateStatus(type, message) {
-    const statusElement = document.getElementById('status');
-    statusElement.textContent = message;
-    statusElement.className = `fw - bold text - ${ this.getStatusColor(type) } `;
-}
+    const tbody = uebersicht.querySelector('tbody');
+    if (!tbody) return;
 
-getStatusColor(type) {
-    const colors = {
-        ready: 'success',
-        saving: 'warning',
-        saved: 'success',
-        error: 'danger'
-    };
-    return colors[type] || 'secondary';
-}
+    // Tabelle leeren
+    tbody.innerHTML = '';
 
-updateLastSaved() {
-    const now = new Date();
-    const timeString = now.toLocaleTimeString('de-DE', {
-        hour: '2-digit',
-        minute: '2-digit'
+    // Paletten-Zeilen hinzufügen
+    palettenDaten.forEach(palette => {
+        const row = tbody.insertRow();
+        row.innerHTML = `
+            <td class="text-center">${palette.paletteNr}</td>
+            <td class="text-center">${palette.vonGebinde}</td>
+            <td class="text-center">${palette.bisGebinde}</td>
+            <td class="text-center">${palette.anzahlGebinde}</td>
+        `;
     });
-    document.getElementById('lastSaved').textContent = timeString;
+
+    // Übersicht anzeigen
+    uebersicht.style.display = 'block';
+    console.log('Paletten-Übersicht angezeigt');
 }
 
-showError(message) {
-    // Hier könntest du eine schöne Toast-Notification einbauen
-    alert('Fehler: ' + message);
+// Paletten-Übersicht verstecken
+function versteckePalettenUebersicht() {
+    const uebersicht = document.getElementById('palettenUebersicht');
+    if (uebersicht) {
+        uebersicht.style.display = 'none';
+    }
 }
 
-showSuccess(message) {
-    // Hier könntest du eine schöne Toast-Notification einbauen
-    alert('Erfolg: ' + message);
+// Palettenetiketten drucken
+function palettenetikettenAusdruck() {
+    console.log('🎨 Palettenetiketten-Ausdruck gestartet');
+
+    if (!palettenDaten || palettenDaten.length === 0) {
+        document.getElementById('erste_gebinde')?.focus();
+        return;
+    }
+
+    const html = generiereEtikettenHTML();
+
+    // Blob-URL erstellen – wird nicht von Popup-Blockern geblockt
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
+
+    if (!tab) {
+        // Letzter Fallback: direkt im selben Fenster als Druckansicht
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:white;';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            iframe.contentWindow.onafterprint = () => {
+                document.body.removeChild(iframe);
+                URL.revokeObjectURL(url);
+            };
+        };
+    } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
 }
+
+// Paletten-Packliste drucken
+function palettenPacklisteAusdruck() {
+    console.log('Paletten-Packliste-Ausdruck gestartet');
+
+    if (!palettenDaten || palettenDaten.length === 0) {
+        document.getElementById('erste_gebinde')?.focus();
+        return;
+    }
+
+    const html = generierePacklisteHTML();
+
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
+
+    if (!tab) {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:white;';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            iframe.contentWindow.onafterprint = () => {
+                document.body.removeChild(iframe);
+                URL.revokeObjectURL(url);
+            };
+        };
+    } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
 }
 
-// ===========================================
-// INITIALIZATION
-// ===========================================
+// Alternative Druck-Methode ohne Popups
+function alternativerDruck(typ) {
+    console.log('Starte alternativen Druck für:', typ);
 
-// Page loaded - initialize app
-document.addEventListener('DOMContentLoaded', () => {
-    window.lieferungManager = new LieferungManager();
+    // Erstelle versteckten Druckbereich
+    let printDiv = document.getElementById('printArea');
+    if (printDiv) {
+        printDiv.remove();
+    }
 
-    // Keyboard shortcuts (ersetzt Access KeyDown Events)
-    document.addEventListener('keydown', (e) => {
-        if (e.ctrlKey) {
-            switch (e.key) {
-                case 'n':
-                    e.preventDefault();
-                    window.lieferungManager.neuerDatensatz();
-                    break;
-                case 's':
-                    e.preventDefault();
-                    window.lieferungManager.speichern();
-                    break;
-                case 'p':
-                    e.preventDefault();
-                    window.lieferungManager.drucken();
-                    break;
+    printDiv = document.createElement('div');
+    printDiv.id = 'printArea';
+    printDiv.style.position = 'fixed';
+    printDiv.style.top = '-9999px';
+    printDiv.style.left = '-9999px';
+    printDiv.innerHTML = typ === 'etiketten' ? generiereEtikettenHTML() : generierePacklisteHTML();
+    document.body.appendChild(printDiv);
+
+    // CSS für Druck hinzufügen
+    let printStyle = document.getElementById('printStyle');
+    if (printStyle) {
+        printStyle.remove();
+    }
+
+    printStyle = document.createElement('style');
+    printStyle.id = 'printStyle';
+    printStyle.textContent = `
+        @media print {
+            body * { visibility: hidden; }
+            #printArea, #printArea * { visibility: visible; }
+            #printArea { position: static !important; top: auto !important; left: auto !important; }
+        }
+    `;
+    document.head.appendChild(printStyle);
+
+    // Drucken
+    setTimeout(() => {
+        window.print();
+
+        // Aufräumen nach dem Drucken
+        setTimeout(() => {
+            if (printDiv) printDiv.remove();
+            if (printStyle) printStyle.remove();
+        }, 1000);
+    }, 500);
+}
+
+// HTML für Packliste generieren
+function generierePacklisteHTML() {
+    const lieferdatum = document.getElementById('lieferdatum')?.value || '';
+    const lieferscheinnummer = document.getElementById('lieferscheinnummer')?.value || '';
+    const abnehmer = document.getElementById('abnehmer')?.value || '';
+
+    const abnehmerDetails = {
+        biotest: { name: 'Biotest-Pharma GmbH & Co KG', adresse: 'Landsteiner Str. 5, D-63303 Dreieich' },
+        csl: { name: 'CSL Behring AG', adresse: 'Wankdorfstr. 10, CH-03000 Bern' }
+    };
+    const abnehmerName = abnehmerDetails[abnehmer]?.name || 'Nicht ausgewählt';
+    const formatiertesDatum = lieferdatum
+        ? new Date(lieferdatum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '___________';
+
+    let html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <title>Paletten-Packliste</title>
+            <style>
+                @page {
+                    margin: 15mm;
+                    size: A4;
+                }
+                @media print {
+                    @page {
+                        margin: 15mm;
+                        size: A4;
+                    }
+                    body {
+                        margin: 0;
+                    }
+                }
+                body {
+                    font-family: Calibri, Arial, sans-serif;
+                    font-size: 11pt;
+                    margin: 0;
+                    padding: 0;
+                    color: #000;
+                }
+                .packliste {
+                    width: 100%;
+                }
+                h2 {
+                    font-size: 16pt;
+                    margin: 0 0 8mm 0;
+                    text-align: left;
+                }
+                .header-info {
+                    margin-bottom: 6mm;
+                }
+                .info-zeile {
+                    margin: 1.2mm 0;
+                }
+                .abnehmer-info {
+                    margin-bottom: 6mm;
+                    font-weight: bold;
+                }
+                .paletten-tabelle {
+                    width: 100%;
+                    border-collapse: collapse;
+                    border: 1px solid #000;
+                }
+                .paletten-tabelle th,
+                .paletten-tabelle td {
+                    border: 1px solid #000;
+                    padding: 2.2mm;
+                }
+                .paletten-tabelle th {
+                    background: #f3f3f3;
+                    text-align: center;
+                    font-weight: bold;
+                }
+                .zentriert {
+                    text-align: center;
+                }
+                .gesamt-zeile td {
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="packliste">
+                <h2>2.4 Paletten Packliste Plasma</h2>
+
+                <div class="header-info">
+                    <div class="info-zeile"><strong>Lieferschein-Nr.: ${lieferscheinnummer || '___________'}</strong></div>
+                    <div class="info-zeile"><strong>Lieferdatum: ${formatiertesDatum}</strong></div>
+                    <div class="info-zeile">Anzahl Paletten: ${palettenDaten.length}</div>
+                </div>
+
+                <div class="abnehmer-info">Abnehmer: ${abnehmerName}</div>
+
+                <table class="paletten-tabelle">
+                <thead>
+                    <tr>
+                        <th>Palette Nr.</th>
+                        <th>Von Gebinde</th>
+                        <th>Bis Gebinde</th>
+                        <th>Anzahl Gebinde</th>
+                        <th>Bemerkungen</th>
+                    </tr>
+                </thead>
+                <tbody>
+    `;
+
+    palettenDaten.forEach(palette => {
+        html += `
+            <tr>
+                <td>${palette.paletteNr}</td>
+                <td>${palette.vonGebinde}</td>
+                <td>${palette.bisGebinde}</td>
+                <td>${palette.anzahlGebinde}</td>
+                <td></td>
+            </tr>
+        `;
+    });
+
+    const gesamtGebinde = palettenDaten.reduce((sum, p) => sum + p.anzahlGebinde, 0);
+
+    html += `
+                </tbody>
+            </table>
+            
+            <tr class="gesamt-zeile">
+                <td colspan="3"><strong>Gesamtzahl Gebinde:</strong></td>
+                <td class="zentriert"><strong>${gesamtGebinde}</strong></td>
+                <td></td>
+            </tr>
+            </tbody>
+            </table>
+
+            <div style="margin-top: 10mm; border-top: 1px solid #999; padding-top: 6mm;">
+                <div>Datum/Unterschrift Kommissionierung: ________________________</div>
+                <br>
+                <div>Datum/Unterschrift Kontrolle: ________________________</div>
+            </div>
+            </div>
+        <script>window.addEventListener('load', function() { window.print(); });<\/script>
+        </body>
+        </html>
+    `;
+
+    return html;
+}
+
+// HTML für Etiketten generieren
+function generiereEtikettenHTML() {
+    console.log('🛠️ Generiere Etiketten HTML...');
+
+    const lieferdatum = document.getElementById('lieferdatum')?.value || '';
+    const lieferscheinnummer = document.getElementById('lieferscheinnummer')?.value || '';
+    const abnehmer = document.getElementById('abnehmer')?.value || '';
+
+    const abnehmerDetails = {
+        biotest: { name: 'Biotest-Pharma GmbH & Co KG', adresse: 'Landsteiner Str. 5<br>D-63303 Dreieich' },
+        csl: { name: 'CSL Behring AG', adresse: 'Wankdorfstr. 10<br>CH-03000 Bern' }
+    };
+    const abnehmerName = abnehmerDetails[abnehmer]?.name || 'Nicht ausgewählt';
+    const abnehmerAdresse = abnehmerDetails[abnehmer]?.adresse || '';
+    const formatiertesDatum = lieferdatum
+        ? new Date(lieferdatum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
+        : '___________';
+
+    let html = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Palettenetiketten</title>
+    <style>
+        @page {
+            margin: 0;
+            size: A4;
+        }
+        
+        @media print {
+            @page {
+                margin: 10mm;
+                size: A4;
+            }
+            .no-print {
+                display: none !important;
+            }
+            body {
+                color: black !important;
+                background: white !important;
+            }
+            .etikett {
+                page-break-after: always !important;
+                display: block !important;
+                visibility: visible !important;
+            }
+            .etikett:last-child {
+                page-break-after: avoid !important;
+            }
+            * {
+                color: black !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
         }
-    });
-});
+        
+        body {
+            font-family: Calibri, 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: white;
+        }
+        
+        .etikett {
+            width: calc(100% - 30mm);
+            max-width: 180mm;
+            margin: 5mm auto;
+            page-break-after: always;
+            padding: 10mm;
+            background: white;
+            position: relative;
+            z-index: 1000;
+        }
+        
+        .etikett-tabelle {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #000;
+        }
+        
+        .etikett-tabelle td {
+            border-bottom: 1px solid #000;
+            text-align: center;
+            vertical-align: middle;
+        }
+        
+        .header-cell {
+            font-size: 35px;
+            font-weight: bold;
+        }
+        
+        .temp {
+            font-size: 35px;
+            font-weight: bold;
+        }
+        
+        .kunde-cell {
+            text-align: left;
+            padding: 3mm;
+        }
+        
+        .kunde-name {
+            font-size: 35px;
+            font-weight: bold;
+            margin: 1mm 0;
+        }
+        
+        .info-cell {
+            font-size: 22px;
+        }
+        
+        .info-value {
+            font-size: 35px;
+            font-weight: bold;
+            display: block;
+            margin-top: 2mm;
+        }
+        
+        .label {
+            font-size: 18pt;
+            margin-bottom: 2mm;
+        }
+    </style>
+</head>
+<body>`;
 
-// Export für andere Module
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = LieferungManager;
+    // Prüfe ob Paletten-Daten vorhanden sind
+    if (!palettenDaten || palettenDaten.length === 0) {
+        console.warn('⚠️ Keine Paletten-Daten verfügbar');
+        html += `
+        <div class="etikett">
+            <table class="etikett-tabelle">
+                <tr>
+                    <td class="header-cell" style="height: 80mm;">PALETTENETIKETT</td>
+                </tr>
+                <tr>
+                    <td style="text-align: center; color: red; font-size: 20px; height: 100mm;">
+                        <p>FEHLER: Keine Paletten-Daten verfügbar!</p>
+                        <p>Bitte geben Sie Gebinde-Nummern ein.</p>
+                    </td>
+                </tr>
+            </table>
+        </div>`;
+    } else {
+        console.log(`🎨 Generiere ${palettenDaten.length} professionelle Etiketten`);
+
+        palettenDaten.forEach((palette, index) => {
+            console.log(`Etikett ${index + 1}:`, palette);
+            html += `
+        <div class="etikett">
+            <table class="etikett-tabelle">
+                <!-- Header -->
+                <tr>
+                    <td class="header-cell" style="height: 14mm;"><strong>Human plasma for fractionation</strong></td>
+                </tr>
+
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Lagertemperatur / storage temperature:</strong><br>
+                        <span class="temp">&lt; - 20°C</span>
+                    </td>
+                </tr>
+                
+                <!-- Kunde -->
+                <tr>
+                    <td class="kunde-cell" style="height: 26mm;">
+                        <div class="label"><strong>Kunde / customer:</strong></div>
+                        <div class="kunde-name">${abnehmerName}</div>
+                        <div style="font-size: 35px; font-weight: bold;">${abnehmerAdresse}</div>
+                    </td>
+                </tr>
+                
+                <!-- Lieferschein & Datum -->
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Lieferdatum / date of delivery:</strong><br>
+                        <span class="info-value">${formatiertesDatum}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Lieferscheinnummer / delivery note:</strong><br>
+                        <span class="info-value">${lieferscheinnummer || 'LSN-____'}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Palettennummer / pallet-No.:</strong><br>
+                        <span class="info-value">${String(palette.paletteNr).padStart(2, '0')} von/of ${String(palettenDaten.length).padStart(2, '0')}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Gebindenummer / box-Nr.: from-to:</strong><br>
+                        <span class="info-value">${palette.vonGebinde}&nbsp;&nbsp;&nbsp;to&nbsp;&nbsp;&nbsp;${palette.bisGebinde}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="info-cell" style="height: 14mm;">
+                        <strong>Anzahl Gebinde / number of boxes:</strong><br>
+                        <span class="info-value">${palette.anzahlGebinde}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td class="kunde-cell" style="height: 20mm;">
+                        <div class="label"><strong>Absender / consigner:</strong></div>
+                        <div class="kunde-name" style="font-size: 28px;">DRK Blutspendedienst West</div>
+                        <div style="font-size: 35px; font-weight: bold;">Zentrum Hagen</div>
+                        <div style="font-size: 35px; font-weight: bold;">Feithstraße 180 - 186<br>D-58097 Hagen</div>
+                    </td>
+                </tr>
+            </table>
+        </div>`;
+        });
+    }
+
+    html += `
+<script>window.addEventListener('load', function() { window.print(); });<\/script>
+</body>
+</html>`;
+
+    console.log('✅ Professionelles HTML generiert, Gesamt-Länge:', html.length);
+    return html;
 }
 
-// Automatisch eine Instanz erstellen wenn DOM geladen ist
-document.addEventListener('DOMContentLoaded', function() {
-    // Globale Instanz für Debugging und externe Zugriffe
-    window.lieferungManager = new LieferungManager();
-    console.log('LieferungManager initialisiert');
-});
+console.log('lieferung-logic-new.js geladen');
