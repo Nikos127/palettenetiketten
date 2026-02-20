@@ -563,16 +563,17 @@ function generierePacklisteHTML() {
             <title>Paletten-Packliste</title>
             <style>
                 @page {
-                    margin: 15mm;
+                    margin: 0;
                     size: A4;
                 }
                 @media print {
                     @page {
-                        margin: 15mm;
+                        margin: 0;
                         size: A4;
                     }
                     body {
                         margin: 0;
+                        padding: 15mm;
                     }
                 }
                 body {
@@ -719,7 +720,7 @@ function generiereEtikettenHTML() {
         
         @media print {
             @page {
-                margin: 10mm;
+                margin: 0;
                 size: A4;
             }
             .no-print {
