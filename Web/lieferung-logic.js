@@ -80,8 +80,7 @@ class LieferungManager {
         try {
             // Hier würdest du normalerweise eine API aufrufen
             this.abnehmerData = [
-                { id: 'baxter', name: 'Baxter Deutschland GmbH', code: 'BAX' },
-                { id: 'biotest', name: 'Biotest AG', code: 'BIO' },
+                { id: 'biotest', name: 'Biotest-Pharma GmbH & Co KG', code: 'BIO' },
                 { id: 'csl', name: 'CSL Behring', code: 'CSL' }
             ];
 
@@ -530,10 +529,6 @@ getAbnehmerDetails(abnehmerId) {
         'biotest': {
             fullName: 'Biotest-Pharma GmbH & Co KG',
             adresse: 'Landsteiner Str. 5\nD-63303 Dreieich'
-        },
-        'baxter': {
-            fullName: 'Baxter Deutschland GmbH',
-            adresse: ''
         },
         'csl': {
             fullName: 'CSL Behring AG',
