@@ -52,6 +52,68 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     // Button Event-Listener mit Debug-Ausgaben
+    // --- Neu ---
+    const btnNeu = document.getElementById('btnNeu');
+    if (btnNeu) {
+        btnNeu.addEventListener('click', function () {
+            const form = document.getElementById('lieferungForm');
+            if (!form) return;
+            if (form.querySelector('[required]') && isModified()) {
+                if (!confirm('Ungespeicherte Änderungen gehen verloren. Fortfahren?')) return;
+            }
+            form.reset();
+            form.classList.remove('was-validated');
+            palettenDaten = [];
+            versteckePalettenUebersicht();
+            // Pflichtfelder wieder rot markieren
+            form.querySelectorAll('[required]').forEach(f => {
+                f.classList.remove('is-valid');
+                f.classList.add('is-invalid');
+            });
+            document.getElementById('lieferscheinnummer')?.focus();
+        });
+    }
+
+    // --- Speichern ---
+    const btnSpeichern = document.getElementById('btnSpeichern');
+    if (btnSpeichern) {
+        btnSpeichern.addEventListener('click', function () {
+            const form = document.getElementById('lieferungForm');
+            if (!form) return;
+            form.classList.add('was-validated');
+            if (!form.checkValidity()) {
+                form.querySelector(':invalid')?.focus();
+                return;
+            }
+            // Daten als JSON in localStorage sichern (Offline-Speicherung)
+            const data = getFormData();
+            const key = 'lieferung_' + (data.lieferscheinnummer || Date.now());
+            localStorage.setItem(key, JSON.stringify(data));
+            alert('Datensatz gespeichert:\n' + key);
+        });
+    }
+
+    // --- Löschen ---
+    const btnLoeschen = document.getElementById('btnLoeschen');
+    if (btnLoeschen) {
+        btnLoeschen.addEventListener('click', function () {
+            const form = document.getElementById('lieferungForm');
+            if (!form) return;
+            const lsnr = document.getElementById('lieferscheinnummer')?.value;
+            if (!lsnr) {
+                alert('Kein Datensatz geladen.');
+                return;
+            }
+            if (!confirm('Datensatz "' + lsnr + '" wirklich löschen?')) return;
+            localStorage.removeItem('lieferung_' + lsnr);
+            form.reset();
+            form.classList.remove('was-validated');
+            palettenDaten = [];
+            versteckePalettenUebersicht();
+            alert('Datensatz gelöscht.');
+        });
+    }
+
     const btnPalettenetiketten = document.getElementById('btnPalettenetiketten');
     const btnPalettenPackliste = document.getElementById('btnPalettenPackliste');
 
@@ -228,6 +290,27 @@ document.addEventListener('DOMContentLoaded', function () {
     console.log('🔧 Debug-Funktionen verfügbar: testValidierung(), testBerechnung(), testDruck()');
 });
 
+// Hilfsfunktionen
+function isModified() {
+    const form = document.getElementById('lieferungForm');
+    if (!form) return false;
+    return Array.from(form.elements).some(el => el.value && el.value.trim() !== '');
+}
+
+function getFormData() {
+    return {
+        lieferscheinnummer: document.getElementById('lieferscheinnummer')?.value || '',
+        lieferdatum: document.getElementById('lieferdatum')?.value || '',
+        abnehmer: document.getElementById('abnehmer')?.value || '',
+        erste_gebinde: document.getElementById('erste_gebinde')?.value || '',
+        letzte_gebinde: document.getElementById('letzte_gebinde')?.value || '',
+        anzahl_gebinde: document.getElementById('anzahl_gebinde')?.value || '',
+        anzahl_paletten: document.getElementById('anzahl_paletten')?.value || '',
+        notizen: document.getElementById('notizen')?.value || '',
+        palettenDaten: palettenDaten
+    };
+}
+
 // Paletten-Berechnung
 function berechnePaletten() {
     console.log('berechnePaletten() aufgerufen');
@@ -340,137 +423,71 @@ function versteckePalettenUebersicht() {
     }
 }
 
-// Palettenetiketten drucken (verbesserte Version mit Debug)
+// Palettenetiketten drucken
 function palettenetikettenAusdruck() {
     console.log('🎨 Palettenetiketten-Ausdruck gestartet');
-    console.log('Aktuelle palettenDaten:', palettenDaten);
 
     if (!palettenDaten || palettenDaten.length === 0) {
         alert('Bitte erst Paletten berechnen!\n\nHinweis: Geben Sie Werte in "Erste Gebinde Nr." und "Letzte Gebinde Nr." ein.');
         return;
     }
 
-    console.log('Generiere Etiketten für', palettenDaten.length, 'Paletten');
+    const html = generiereEtikettenHTML();
 
-    try {
-        // HTML generieren und debuggen
-        const html = generiereEtikettenHTML();
-        console.log('📝 HTML generiert, Länge:', html.length);
-        console.log('HTML Preview (erste 200 Zeichen):', html.substring(0, 200));
+    // Blob-URL erstellen – wird nicht von Popup-Blockern geblockt
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
 
-        // Popup-Fenster öffnen
-        const printWindow = window.open('', 'EtikettenDruck', 'width=800,height=600,scrollbars=yes,resizable=yes');
-
-        if (!printWindow) {
-            console.log('❌ Popup blockiert - verwende Alternative');
-            alternativerDruck('etiketten');
-            return;
-        }
-
-        console.log('✅ Popup-Fenster geöffnet');
-
-        // Methode 1: Zuerst versuchen mit document.write
-        try {
-            printWindow.document.open();
-            printWindow.document.write(html);
-            printWindow.document.close();
-            console.log('✅ HTML mit document.write geschrieben');
-        } catch (writeError) {
-            console.error('❌ document.write fehlgeschlagen:', writeError);
-
-            // Methode 2: Fallback mit innerHTML
-            try {
-                printWindow.document.body.innerHTML = html;
-                console.log('✅ HTML mit innerHTML gesetzt');
-            } catch (innerError) {
-                console.error('❌ innerHTML fehlgeschlagen:', innerError);
-
-                // Methode 3: Manuell DOM aufbauen
-                const testDiv = printWindow.document.createElement('div');
-                testDiv.innerHTML = '<h1>Test Etikett</h1><p>Falls Sie das sehen, funktioniert das Popup!</p>';
-                printWindow.document.body.appendChild(testDiv);
-                console.log('❗ Fallback HTML gesetzt');
-            }
-        }
-
-        // Event-Listener für Laden des Dokuments
-        const tryPrint = () => {
-            setTimeout(() => {
-                try {
-                    console.log('🖨️ Starte Druck...');
-                    printWindow.focus();
-                    printWindow.print();
-                    console.log('✅ Druck gestartet');
-                } catch (printError) {
-                    console.error('❌ Druck-Fehler:', printError);
-                    alert('Druckfehler. Bitte öffnen Sie das Popup-Fenster manuell und drücken Sie Strg+P');
-                }
-            }, 1000);
+    if (!tab) {
+        // Letzter Fallback: direkt im selben Fenster als Druckansicht
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:white;';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            iframe.contentWindow.onafterprint = () => {
+                document.body.removeChild(iframe);
+                URL.revokeObjectURL(url);
+            };
         };
-
-        if (printWindow.document.readyState === 'complete') {
-            tryPrint();
-        } else {
-            printWindow.addEventListener('load', tryPrint);
-        }
-
-        // Backup-Timer
-        setTimeout(() => {
-            try {
-                console.log('🔄 Backup-Druck wird versucht...');
-                printWindow.focus();
-                printWindow.print();
-            } catch (e) {
-                console.error('Backup-Druck-Fehler:', e);
-            }
-        }, 3000);
-
-    } catch (error) {
-        console.error('❌ Fehler beim Öffnen des Druckfensters:', error);
-        alternativerDruck('etiketten');
+    } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 }
 
-// Paletten-Packliste drucken (verbesserte Version)
+// Paletten-Packliste drucken
 function palettenPacklisteAusdruck() {
     console.log('Paletten-Packliste-Ausdruck gestartet');
-    console.log('Aktuelle palettenDaten:', palettenDaten);
 
     if (!palettenDaten || palettenDaten.length === 0) {
         alert('Bitte erst Paletten berechnen!\n\nHinweis: Geben Sie Werte in "Erste Gebinde Nr." und "Letzte Gebinde Nr." ein.');
         return;
     }
 
-    try {
-        // Versuche zuerst Popup-Fenster
-        const printWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes');
+    const html = generierePacklisteHTML();
 
-        if (!printWindow) {
-            console.log('Popup blockiert - verwende Alternative');
-            alternativerDruck('packliste');
-            return;
-        }
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const tab = window.open(url, '_blank');
 
-        const html = generierePacklisteHTML();
-        console.log('Packliste HTML generiert, Länge:', html.length);
-
-        printWindow.document.open();
-        printWindow.document.write(html);
-        printWindow.document.close();
-
-        // Warten und dann drucken
-        setTimeout(() => {
-            try {
-                printWindow.focus();
-                printWindow.print();
-            } catch (e) {
-                console.error('Druck-Fehler:', e);
-            }
-        }, 1500);
-
-    } catch (error) {
-        console.error('Fehler beim Öffnen des Druckfensters:', error);
-        alternativerDruck('packliste');
+    if (!tab) {
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;border:none;z-index:99999;background:white;';
+        iframe.src = url;
+        document.body.appendChild(iframe);
+        iframe.onload = () => {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+            iframe.contentWindow.onafterprint = () => {
+                document.body.removeChild(iframe);
+                URL.revokeObjectURL(url);
+            };
+        };
+    } else {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
     }
 }
 
@@ -528,11 +545,10 @@ function generierePacklisteHTML() {
     const abnehmer = document.getElementById('abnehmer')?.value || '';
 
     const abnehmerDetails = {
-        baxter: 'Baxter Deutschland GmbH',
-        biotest: 'Biotest AG',
-        csl: 'CSL Behring'
+        biotest: { name: 'Biotest-Pharma GmbH & Co KG', adresse: 'Landsteiner Str. 5, D-63303 Dreieich' },
+        csl: { name: 'CSL Behring AG', adresse: 'Wankdorfstr. 10, CH-03000 Bern' }
     };
-    const abnehmerName = abnehmerDetails[abnehmer] || 'Nicht ausgewählt';
+    const abnehmerName = abnehmerDetails[abnehmer]?.name || 'Nicht ausgewählt';
     const formatiertesDatum = lieferdatum
         ? new Date(lieferdatum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
         : '___________';
@@ -662,6 +678,7 @@ function generierePacklisteHTML() {
                 <div>Datum/Unterschrift Kontrolle: ________________________</div>
             </div>
             </div>
+        <script>window.addEventListener('load', function() { window.print(); });<\/script>
         </body>
         </html>
     `;
@@ -678,11 +695,11 @@ function generiereEtikettenHTML() {
     const abnehmer = document.getElementById('abnehmer')?.value || '';
 
     const abnehmerDetails = {
-        baxter: 'Baxter Deutschland GmbH',
-        biotest: 'Biotest AG',
-        csl: 'CSL Behring'
+        biotest: { name: 'Biotest-Pharma GmbH & Co KG', adresse: 'Landsteiner Str. 5<br>D-63303 Dreieich' },
+        csl: { name: 'CSL Behring AG', adresse: 'Wankdorfstr. 10<br>CH-03000 Bern' }
     };
-    const abnehmerName = abnehmerDetails[abnehmer] || 'Nicht ausgewählt';
+    const abnehmerName = abnehmerDetails[abnehmer]?.name || 'Nicht ausgewählt';
+    const abnehmerAdresse = abnehmerDetails[abnehmer]?.adresse || '';
     const formatiertesDatum = lieferdatum
         ? new Date(lieferdatum).toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' })
         : '___________';
@@ -700,19 +717,26 @@ function generiereEtikettenHTML() {
         
         @media print {
             @page {
-                margin: 0;
+                margin: 10mm;
                 size: A4;
             }
             .no-print {
                 display: none !important;
             }
+            body {
+                color: black !important;
+                background: white !important;
+            }
             .etikett {
                 page-break-after: always !important;
+                display: block !important;
+                visibility: visible !important;
             }
             .etikett:last-child {
                 page-break-after: avoid !important;
             }
             * {
+                color: black !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
@@ -746,13 +770,11 @@ function generiereEtikettenHTML() {
             border-bottom: 1px solid #000;
             text-align: center;
             vertical-align: middle;
-            padding: 2mm;
         }
         
         .header-cell {
             font-size: 35px;
             font-weight: bold;
-            background-color: #f0f0f0;
         }
         
         .temp {
@@ -829,9 +851,10 @@ function generiereEtikettenHTML() {
                 
                 <!-- Kunde -->
                 <tr>
-                    <td class="kunde-cell" style="height: 20mm;">
+                    <td class="kunde-cell" style="height: 26mm;">
                         <div class="label"><strong>Kunde / customer:</strong></div>
                         <div class="kunde-name">${abnehmerName}</div>
+                        <div style="font-size: 35px; font-weight: bold;">${abnehmerAdresse}</div>
                     </td>
                 </tr>
                 
@@ -870,8 +893,8 @@ function generiereEtikettenHTML() {
                     <td class="kunde-cell" style="height: 20mm;">
                         <div class="label"><strong>Absender / consigner:</strong></div>
                         <div class="kunde-name" style="font-size: 28px;">DRK Blutspendedienst West</div>
-                        <div style="font-size: 24px; font-weight: bold;">Zentrum Hagen</div>
-                        <div style="font-size: 22px; font-weight: bold;">Feithstraße 180 - 186<br>D-58097 Hagen</div>
+                        <div style="font-size: 35px; font-weight: bold;">Zentrum Hagen</div>
+                        <div style="font-size: 35px; font-weight: bold;">Feithstraße 180 - 186<br>D-58097 Hagen</div>
                     </td>
                 </tr>
             </table>
@@ -880,6 +903,7 @@ function generiereEtikettenHTML() {
     }
 
     html += `
+<script>window.addEventListener('load', function() { window.print(); });<\/script>
 </body>
 </html>`;
 
